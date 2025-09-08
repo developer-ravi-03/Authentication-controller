@@ -1,11 +1,10 @@
-# render.yaml - Full stack E-commerce deployment
-
 services:
   - type: web
     name: ecommerce-app
     env: node
-    nodeVersion: 18
-    buildCommand: "npm install && npm run build"
+    region: oregon
+    plan: free
+    buildCommand: "npm ci && npm run build"
     startCommand: "npm start"
     envVars:
       - key: NODE_ENV
