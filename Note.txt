@@ -1,0 +1,13 @@
+--> npm init -y
+--> npm i express dotenv mongoose jsonwebtoken stripe cloudinary cookie-parser bcrypt.js ioredis
+
+set type :
+"type": "module",
+
+#. Create account on ustash
+
+-->for testing redis
+node .\backend\lib\redis.js
+
+optional
+create testredis
