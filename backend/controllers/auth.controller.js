@@ -8,6 +8,14 @@ export const requestOTP = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "Email is required" });
   try {
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ 
+        message: "User with this email already exists. Please login instead." 
+      });
+    }
+    
     // Generate OTP
     const otp = generateOTP();
     // Store OTP in Redis for 5 minutes

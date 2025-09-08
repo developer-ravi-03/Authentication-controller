@@ -1,4 +1,7 @@
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -6,10 +9,10 @@ export function generateOTP() {
 
 export async function sendOTPEmail(email, otp) {
   let transporter = nodemailer.createTransport({
-    service: "gmail", // Use Gmail SMTP
+    service: "gmail",
     auth: {
-      user: "on.developerravi@gmail.com", // your Gmail
-      pass: "ptlklznqroeirowg", // app password (not your Gmail password!)
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
     },
   });
 

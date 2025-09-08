@@ -1,39 +1,76 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import OAuthButton from './OAuthButton';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import OAuthButton from "./OAuthButton";
 
 const VerifyEmail = () => {
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState('email'); // 'email', 'otp', 'success'
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState("email"); // 'email', 'otp', 'success'
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState({ text: '', type: '' });
-  
-  const { requestOTP, verifyOTP } = useAuth();
+  const [message, setMessage] = useState({ text: "", type: "" });
+  const [resendTimer, setResendTimer] = useState(0);
+
+  const { requestOTP, verifyOTP, verifiedEmail } = useAuth();
   const navigate = useNavigate();
 
-  const showMessage = (text, type = 'error') => {
+  // Check for existing verification on component mount
+  useEffect(() => {
+    if (verifiedEmail) {
+      setEmail(verifiedEmail);
+      setStep("success");
+      showMessage("Email already verified!", "success");
+    }
+  }, [verifiedEmail]);
+
+  // Timer effect for resend countdown
+  useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer(resendTimer - 1);
+      }, 1000);
+    } else if (resendTimer === 0) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const showMessage = (text, type = "error") => {
     setMessage({ text, type });
-    setTimeout(() => setMessage({ text: '', type: '' }), 5000);
+    setTimeout(() => setMessage({ text: "", type: "" }), 5000);
+  };
+
+  const startResendTimer = () => {
+    setResendTimer(60); // 60 seconds countdown
   };
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
     if (!email.trim()) {
-      showMessage('Please enter a valid email address');
+      showMessage("Please enter a valid email address");
       return;
     }
 
     setIsLoading(true);
-    setMessage({ text: '', type: '' });
+    setMessage({ text: "", type: "" });
 
     try {
       await requestOTP(email);
-      setStep('otp');
-      showMessage('Verification code sent to your email!', 'success');
+      setStep("otp");
+      startResendTimer(); // Start the 60-second timer
+      showMessage("Verification code sent to your email!", "success");
     } catch (error) {
       showMessage(error.message);
+      // If user already exists, suggest login
+      if (error.message.includes("already exists")) {
+        setTimeout(() => {
+          setMessage({
+            text: error.message,
+            type: "error",
+          });
+        }, 8000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -42,17 +79,17 @@ const VerifyEmail = () => {
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     if (!otp.trim() || otp.length !== 6) {
-      showMessage('Please enter the 6-digit verification code');
+      showMessage("Please enter the 6-digit verification code");
       return;
     }
 
     setIsLoading(true);
-    setMessage({ text: '', type: '' });
+    setMessage({ text: "", type: "" });
 
     try {
       await verifyOTP(email, otp);
-      setStep('success');
-      showMessage('Email verified successfully!', 'success');
+      setStep("success");
+      showMessage("Email verified successfully!", "success");
     } catch (error) {
       showMessage(error.message);
     } finally {
@@ -61,11 +98,14 @@ const VerifyEmail = () => {
   };
 
   const handleResendOTP = async () => {
+    if (resendTimer > 0) return; // Prevent resend if timer is active
+
     setIsLoading(true);
     try {
       await requestOTP(email);
-      showMessage('Verification code sent again!', 'success');
-      setOtp('');
+      startResendTimer(); // Start timer again
+      showMessage("Verification code sent again!", "success");
+      setOtp("");
     } catch (error) {
       showMessage(error.message);
     } finally {
@@ -74,13 +114,17 @@ const VerifyEmail = () => {
   };
 
   const handleOtpChange = (e) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
+    const value = e.target.value.replace(/[^0-9]/g, "");
     if (value.length <= 6) {
       setOtp(value);
       // Auto-submit when 6 digits are entered
       if (value.length === 6) {
         setTimeout(() => {
-          document.getElementById('verify-form').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          document
+            .getElementById("verify-form")
+            .dispatchEvent(
+              new Event("submit", { cancelable: true, bubbles: true })
+            );
         }, 100);
       }
     }
@@ -92,8 +136,18 @@ const VerifyEmail = () => {
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-16 w-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mb-6 animate-bounce-subtle">
-            <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+            <svg
+              className="h-8 w-8 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"
+              />
             </svg>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -108,7 +162,7 @@ const VerifyEmail = () => {
         <div className="card animate-slide-up">
           <div className="card-body">
             {/* Email Step */}
-            {step === 'email' && (
+            {step === "email" && (
               <form onSubmit={handleSendOTP} className="space-y-6">
                 <div>
                   <label htmlFor="email" className="form-label">
@@ -131,13 +185,13 @@ const VerifyEmail = () => {
                   disabled={isLoading}
                   className="w-full btn-primary"
                 >
-                  {isLoading ? 'Sending...' : 'Send Verification Code'}
+                  {isLoading ? "Sending..." : "Send Verification Code"}
                 </button>
               </form>
             )}
 
             {/* OTP Step */}
-            {step === 'otp' && (
+            {step === "otp" && (
               <div className="space-y-6">
                 <div className="text-center">
                   <p className="text-gray-600 mb-4">
@@ -145,10 +199,17 @@ const VerifyEmail = () => {
                   </p>
                   <p className="font-semibold text-gray-900">{email}</p>
                 </div>
-                
-                <form id="verify-form" onSubmit={handleVerifyOTP} className="space-y-6">
+
+                <form
+                  id="verify-form"
+                  onSubmit={handleVerifyOTP}
+                  className="space-y-6"
+                >
                   <div>
-                    <label htmlFor="otp" className="form-label text-center block">
+                    <label
+                      htmlFor="otp"
+                      className="form-label text-center block"
+                    >
                       Verification Code
                     </label>
                     <input
@@ -164,38 +225,120 @@ const VerifyEmail = () => {
                       autoComplete="one-time-code"
                     />
                   </div>
-                  
-                  <div className="space-y-3">
-                    <button
-                      type="submit"
-                      disabled={isLoading || otp.length !== 6}
-                      className="w-full btn-primary"
-                    >
-                      {isLoading ? 'Verifying...' : 'Verify Code'}
-                    </button>
-                    
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || otp.length !== 6}
+                    className="w-full btn-primary"
+                  >
+                    {isLoading ? "Verifying..." : "Verify Code"}
+                  </button>
+                </form>
+
+                {/* Professional Resend Section */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      {resendTimer > 0 ? (
+                        <span className="flex items-center space-x-2">
+                          <svg
+                            className="w-4 h-4 text-blue-500 animate-pulse"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span>Resend in {resendTimer}s</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-500">
+                          Didn't receive the code?
+                        </span>
+                      )}
+                    </div>
+
                     <button
                       type="button"
                       onClick={handleResendOTP}
-                      disabled={isLoading}
-                      className="w-full btn-secondary"
+                      disabled={isLoading || resendTimer > 0}
+                      className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                        resendTimer > 0 || isLoading
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      }`}
                     >
-                      {isLoading ? 'Sending...' : 'Resend Code'}
+                      {isLoading ? (
+                        <>
+                          <svg
+                            className="w-4 h-4 mr-2 animate-spin"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            className="w-4 h-4 mr-2"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                          </svg>
+                          Resend Code
+                        </>
+                      )}
                     </button>
                   </div>
-                </form>
+                </div>
               </div>
             )}
 
             {/* Success Step */}
-            {step === 'success' && (
+            {step === "success" && (
               <div className="text-center space-y-6">
                 <div className="mx-auto h-16 w-16 bg-green-100 rounded-full flex items-center justify-center animate-bounce-subtle">
-                  <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-8 w-8 text-green-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </div>
-                
+
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     Email Verified Successfully!
@@ -204,9 +347,9 @@ const VerifyEmail = () => {
                     You can now proceed to create your account.
                   </p>
                 </div>
-                
+
                 <button
-                  onClick={() => navigate('/signup')}
+                  onClick={() => navigate("/signup")}
                   className="w-full btn-primary"
                 >
                   Continue to Signup
@@ -216,7 +359,11 @@ const VerifyEmail = () => {
 
             {/* Error/Success Messages */}
             {message.text && (
-              <div className={`mt-4 ${message.type === 'error' ? 'alert-error' : 'alert-success'}`}>
+              <div
+                className={`mt-4 ${
+                  message.type === "error" ? "alert-error" : "alert-success"
+                }`}
+              >
                 {message.text}
               </div>
             )}
@@ -235,10 +382,10 @@ const VerifyEmail = () => {
               </span>
             </div>
           </div>
-          
-          <OAuthButton 
-            provider="Google" 
-            text="Sign up with Google" 
+
+          <OAuthButton
+            provider="Google"
+            text="Sign up with Google"
             disabled={true}
           />
         </div>

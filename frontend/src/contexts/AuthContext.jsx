@@ -1,12 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { authAPI } from "../services/api";
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
@@ -14,7 +14,11 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [verifiedEmail, setVerifiedEmail] = useState(null);
+  const [verifiedEmail, setVerifiedEmail] = useState(() => {
+    // Load verified email from localStorage on initialization
+    const stored = localStorage.getItem("verifiedEmail");
+    return stored || null;
+  });
 
   useEffect(() => {
     // Check if user is already logged in
@@ -49,6 +53,7 @@ export const AuthProvider = ({ children }) => {
       setUser(userData.user);
       // Clear verified email since signup is complete
       setVerifiedEmail(null);
+      localStorage.removeItem("verifiedEmail");
       return userData;
     } catch (error) {
       throw error;
@@ -59,10 +64,11 @@ export const AuthProvider = ({ children }) => {
     try {
       await authAPI.logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     } finally {
       setUser(null);
       setVerifiedEmail(null);
+      localStorage.removeItem("verifiedEmail");
     }
   };
 
@@ -79,6 +85,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await authAPI.verifyOTP(email, otp);
       setVerifiedEmail(email);
+      // Store verified email in localStorage to persist across refreshes
+      localStorage.setItem("verifiedEmail", email);
       return result;
     } catch (error) {
       throw error;
@@ -87,6 +95,8 @@ export const AuthProvider = ({ children }) => {
 
   const clearVerifiedEmail = () => {
     setVerifiedEmail(null);
+    // Also remove from localStorage
+    localStorage.removeItem("verifiedEmail");
   };
 
   const value = {
@@ -99,12 +109,8 @@ export const AuthProvider = ({ children }) => {
     requestOTP,
     verifyOTP,
     clearVerifiedEmail,
-    setUser
+    setUser,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
